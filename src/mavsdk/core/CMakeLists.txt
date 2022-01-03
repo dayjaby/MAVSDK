@@ -102,6 +102,7 @@ install(FILES
     include/mavsdk/log_callback.h
     include/mavsdk/plugin_base.h
     include/mavsdk/geometry.h
+    plugin_base_impl.h
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mavsdk"
 )
 

@@ -6,6 +6,7 @@
 #include <mavsdk/plugins/ftp/ftp.h>
 #include <mavsdk/plugins/mavlink_passthrough/mavlink_passthrough.h>
 #include <mavsdk/plugins/param_server/param_server.h>
+#include <mavsdk/plugin_impl_base.h>
 
 #include <chrono>
 #include <future>
@@ -25,6 +26,37 @@ void usage(const std::string& bin_name)
               << "    Start mavlink camera_manager with camera definition file in <root_dir>"
               << std::endl;
 }
+
+class CameraManagerPluginImpl : public PluginImplBase {
+public:
+    explicit CameraManagerPluginImpl(System& system) : PluginImplBase(system)
+    {
+        _parent->register_plugin(this);
+    }
+    explicit CameraManagerPluginImpl(std::shared_ptr<System> system) : PluginImplBase(system)
+    {
+        _parent->register_plugin(this);
+    }
+    ~CameraManagerPluginImpl() { _parent->unregister_plugin(this); }
+
+    void init() override;
+    void deinit() override;
+
+    void enable() override;
+    void disable() override;
+};
+
+void CameraManagerPluginImpl::init()
+{
+    _parent->provide_server_param_int("CAM_EV", 5);
+
+    _parent->provide_server_param_int("CAM_ISO", 0);
+    _parent->subscribe_param<uint32_t>(
+        "CAM_ISO", [](uint32_t iso) { std::cout << "NEW ISO: " << iso << std::endl; }, nullptr);
+}
+void CameraManagerPluginImpl::deinit() {}
+void CameraManagerPluginImpl::enable() {}
+void CameraManagerPluginImpl::disable() {}
 
 int main(int argc, char** argv)
 {
@@ -67,9 +99,7 @@ int main(int argc, char** argv)
     auto ftp_server = Ftp{system};
     ftp_server.set_root_directory(argv[1]);
 
-    auto parameter_server = ParamServer{system};
-    parameter_server.provide_param_int("CAM_ISO", 1);
-    parameter_server.provide_param_float("CAM_EV", -0.3f);
+    auto parameter_server = CameraManagerPluginImpl{system};
 
     auto mavlink_passthrough = MavlinkPassthrough{system};
     mavlink_passthrough.subscribe_message_async(
@@ -95,10 +125,11 @@ int main(int argc, char** argv)
                         CAMERA_CAP_FLAGS_CAN_CAPTURE_VIDEO_IN_IMAGE_MODE |
                         CAMERA_CAP_FLAGS_HAS_BASIC_ZOOM | CAMERA_CAP_FLAGS_HAS_BASIC_FOCUS |
                         CAMERA_CAP_FLAGS_HAS_VIDEO_STREAM;
-                    camera_information.cam_definition_version = 0;
+                    camera_information.cam_definition_version = 5;
                     strncpy(
                         camera_information.cam_definition_uri,
-                        "mftp://[;compid=100]infos/camera_info.xml",
+                        // "mftp://[;compid=100]infos/camera_info.xml",
+                        "https://raw.githubusercontent.com/BeagleSystems/camera_information/main/eh2000.xml",
                         140);
                     std::cout << "Sending CAMERA_INFORMATION" << std::endl;
                     mavlink_message_t send_msg;
